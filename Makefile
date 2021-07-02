@@ -8,7 +8,7 @@ clean:
 	rm -f config.mk
 
 install:
-	@$(MAKE) -f user.mk all
+	@$(MAKE) -f user.mk install
 	mkdir -p $(DESTDIR)/etc/udev/rules.d
 	cp usbpend.rules $(DESTDIR)/etc/udev/rules.d
 
