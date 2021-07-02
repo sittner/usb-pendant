@@ -1,10 +1,7 @@
-.dep
-*.o
-*.lst
-*.elf
-*.eep
-*.hex
-*.lss
-*.map
-*.sym
-
+usbpend
+config.mk
+debian/*.log
+debian/*.substvars
+debian/.debhelper/
+debian/files
+debian/usb-pendant/
