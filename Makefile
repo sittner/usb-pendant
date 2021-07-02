@@ -1,25 +1,20 @@
 .PHONY: all configure install clean
 
-ifeq (, $(COMP))
-  COMP = $(shell which halcompile)
-endif
-ifeq (, $(COMP))
-  COMP = $(shell which comp)
-endif
-ifeq (, $(COMP))
-  $(error halcompile/comp executable not found or set)
-endif
-
-all: usbpend
+all: configure
+	@$(MAKE) -f user.mk all
 
 clean:
 	rm -f usbpend
+	rm -f config.mk
 
 install:
-	$(COMP) --install usbpend.comp
-	mkdir -p /etc/udev/rules.d
-	cp usbpend.rules /etc/udev/rules.d
+	@$(MAKE) -f user.mk all
+	mkdir -p $(DESTDIR)/etc/udev/rules.d
+	cp usbpend.rules $(DESTDIR)/etc/udev/rules.d
 
-usbpend:
-	$(COMP) --compile usbpend.comp
+configure: config.mk
+
+config.mk: configure.mk
+	@$(MAKE) -s -f configure.mk > config.mk.tmp
+	@mv config.mk.tmp config.mk
 
