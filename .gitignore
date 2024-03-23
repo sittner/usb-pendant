@@ -5,3 +5,4 @@ debian/*.substvars
 debian/.debhelper/
 debian/files
 debian/usb-pendant/
+debian/debhelper-build-stamp
