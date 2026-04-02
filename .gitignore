@@ -1,5 +1,4 @@
-usbpend
-config.mk
+usbpend.so
 debian/*.log
 debian/*.substvars
 debian/.debhelper/
