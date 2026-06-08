@@ -61,7 +61,7 @@ typedef struct __attribute__ ((__packed__)) {
 static void user_mainloop(void) {
   int fd, len, do_init;
   int16_t delta;
-  USBHID_Report_Data_In_t data, last_data;
+  USBHID_Report_Data_In_t data, last_data = {0};
   struct pollfd pfd[2];
 
   pfd[1].fd = GOMC_EXIT_FD();
