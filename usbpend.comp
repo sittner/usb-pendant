@@ -25,9 +25,6 @@ pin out bit btn_c4;
 pin out bit btn_aux_1;
 pin out bit btn_aux_2;
 
-option extra_setup;
-option extra_cleanup;
-
 ;;
 
 #include <stdio.h>
@@ -47,7 +44,6 @@ option extra_cleanup;
 #include <fcntl.h>
 #include <unistd.h>
 #include <poll.h>
-#include <sys/eventfd.h>
 
 #define CHECK_BUTTON(x, y) ((x & (1 << y)) ? 1 : 0)
 
@@ -62,34 +58,18 @@ typedef struct __attribute__ ((__packed__)) {
   uint16_t buttons;
 } USBHID_Report_Data_In_t;
 
-static int exit_fd = -1;
-
-EXTRA_SETUP() {
-  exit_fd = eventfd(0, EFD_NONBLOCK);
-  if (exit_fd < 0)
-    return -1;
-  return 0;
-}
-
-EXTRA_CLEANUP() {
-  if (exit_fd >= 0) {
-    uint64_t val = 1;
-    write(exit_fd, &val, sizeof(val));
-  }
-}
-
 static void user_mainloop(void) {
   int fd, len, do_init;
   int16_t delta;
   USBHID_Report_Data_In_t data, last_data;
   struct pollfd pfd[2];
 
-  pfd[1].fd = exit_fd;
+  pfd[1].fd = GOMC_EXIT_FD();
   pfd[1].events = POLLIN;
 
   do_init = 1;
   hw_time = 0;
-  while(1) {
+  while (!GOMC_SHOULD_EXIT()) {
     fd = open("/dev/usbpend", O_RDWR | O_NONBLOCK);
     if (fd < 0) {
       // Wait up to 1s or until exit event.
@@ -103,13 +83,13 @@ static void user_mainloop(void) {
     pfd[0].fd = fd;
     pfd[0].events = POLLIN;
 
-    while (1) {
+    while (!GOMC_SHOULD_EXIT()) {
       int ret = poll(pfd, 2, -1);
       if (ret < 0)
         break;
       if (pfd[1].revents & POLLIN) {
         close(fd);
-        goto out;
+        return;
       }
       if (!(pfd[0].revents & POLLIN))
         continue;
@@ -124,7 +104,7 @@ static void user_mainloop(void) {
       }
 
       if (!do_init) {
-	      hw_time = (hw_time & 0xffff0000) | data.app_time;
+              hw_time = (hw_time & 0xffff0000) | data.app_time;
         if (data.app_time < last_data.app_time) {
           hw_time += 0x10000;
         }
@@ -178,8 +158,4 @@ static void user_mainloop(void) {
     btn_aux_2 = 0;
 
   }
-out:
-  close(exit_fd);
-  exit_fd = -1;
 }
-
