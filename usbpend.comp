@@ -46,6 +46,8 @@ option extra_cleanup;
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <poll.h>
+#include <sys/eventfd.h>
 
 #define CHECK_BUTTON(x, y) ((x & (1 << y)) ? 1 : 0)
 
@@ -60,34 +62,61 @@ typedef struct __attribute__ ((__packed__)) {
   uint16_t buttons;
 } USBHID_Report_Data_In_t;
 
-static int exit_flag = 0;
+static int exit_fd = -1;
 
 EXTRA_SETUP() {
-  exit_flag = 0;
+  exit_fd = eventfd(0, EFD_NONBLOCK);
+  if (exit_fd < 0)
+    return -1;
   return 0;
 }
 
 EXTRA_CLEANUP() {
-  exit_flag = 1;
+  if (exit_fd >= 0) {
+    uint64_t val = 1;
+    write(exit_fd, &val, sizeof(val));
+  }
 }
 
 static void user_mainloop(void) {
   int fd, len, do_init;
   int16_t delta;
   USBHID_Report_Data_In_t data, last_data;
+  struct pollfd pfd[2];
+
+  pfd[1].fd = exit_fd;
+  pfd[1].events = POLLIN;
 
   do_init = 1;
   hw_time = 0;
-  while(!exit_flag) {
-    fd = open("/dev/usbpend", O_RDWR);
+  while(1) {
+    fd = open("/dev/usbpend", O_RDWR | O_NONBLOCK);
     if (fd < 0) {
-      sleep(1);
+      // Wait up to 1s or until exit event.
+      pfd[0].fd = -1;
+      pfd[0].events = 0;
+      if (poll(pfd, 2, 1000) > 0 && (pfd[1].revents & POLLIN))
+        break;
       continue;
     }
 
-    while (!exit_flag) {
+    pfd[0].fd = fd;
+    pfd[0].events = POLLIN;
+
+    while (1) {
+      int ret = poll(pfd, 2, -1);
+      if (ret < 0)
+        break;
+      if (pfd[1].revents & POLLIN) {
+        close(fd);
+        goto out;
+      }
+      if (!(pfd[0].revents & POLLIN))
+        continue;
       len = read(fd, &data, sizeof(data));
       if (len < 0) {
+        if (errno == EAGAIN)
+          continue;
         break;
       }
       if (len != sizeof(data)) {
@@ -149,5 +178,8 @@ static void user_mainloop(void) {
     btn_aux_2 = 0;
 
   }
+out:
+  close(exit_fd);
+  exit_fd = -1;
 }
 
